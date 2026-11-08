@@ -1,13 +1,14 @@
-# FTB Evolution 2 Thaumaturge Restore
+# FTB Evolution 2 - Thaumaturge Restore
 
-An installer that adds Thaumaturge back to FTB Evolution 2.
+An installer that adds Thaumaturge back to FTB Evolution 2. The nostalgia must not stop.
 
 FTB Evolution 2 shipped [Thaumaturge](https://github.com/Leclowndu93150/Thaumaturge) and Applied Thaumaturge in
-1.0.0 and removed them in 1.0.1. This installer puts back both mods, the Thaumaturge quest chapter and the rest of
-the pack's Thaumaturge content, into any later version of the pack. Content added in newer pack versions is left
-unchanged.
+1.0.0 and removed them in 1.0.1 due to [copyright issues with Team CoFH](https://x.com/FTB_Team/status/2108144492410757300).
 
-It runs on Linux, Windows and macOS, for client instances and dedicated servers.
+This installer adds back both mods, integrating the Thaumaturge quest chapter and rest of the removed content
+into the later versions, without losing the newer improvements and fixes.
+
+This is a hack and required multiple manual patches. I really hope FTB manages to reintegrate Thaumaturge into the pack.
 
 ## Requirements
 
@@ -90,7 +91,7 @@ FTB App, CurseForge, the Modrinth App, ATLauncher and GDLauncher.
 - Key bindings: Thaumaturge keys whose defaults collide with another binding get the pack's 1.0.0 bindings, for
   example Change Focus on Ctrl+F instead of F. Bindings you changed yourself are left alone.
 
-The installer adds only what is missing. Re-running it changes nothing, and after a pack update it re-applies only
+The installer adds only what is missing. After a pack update it re-applies only
 what the update removed. Before writing, it checks the resulting quest book for duplicate IDs, missing quests and
 item IDs that the installed mods do not provide. If a check fails, it writes nothing.
 
@@ -199,11 +200,7 @@ comes back. Where a later version redesigned a system, the redesign stays.
 
 ## Credits
 
-Thaumaturge is by Leclowndu93150 and contributors. FTB Evolution 2 is by Feed The Beast. This project is not
+Thaumaturge is by Leclowndu93150 and contributors. FTB Evolution 2 is by the Feed The Beast team. This project is not
 affiliated with either.
 
 The jar bundles [ASM](https://asm.ow2.io/) 9.9.1, distributed under the BSD license in `LICENSE-ASM.txt`.
-
-## License
-
-MIT. See `LICENSE`.
