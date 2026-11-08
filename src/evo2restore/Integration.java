@@ -114,9 +114,10 @@ final class Integration {
                 "vis_discount_+2%.description")) {
             ops.add(new Revert(SKILL + key));
         }
-        // 1.8.1 still unlocks the Arcanist with a Thaumometer (stage_triggers.js) but its hint only names Vinteum Dust.
+        // 1.8.1 unlocks the Arcanist with the Arcane Compendium, Vinteum Dust or a Thaumometer (stage_triggers.js),
+        // but its hint only names Vinteum Dust.
         ops.add(new Put("/ftb.shopkeeper.locked.arcanist",
-                "Gather some Vinteum Dust or carry a Thaumometer and I'll share my stock."));
+                "Carry the Arcane Compendium, some Vinteum Dust or a Thaumometer and I'll share my stock."));
         return ops;
     }
 
@@ -136,7 +137,7 @@ final class Integration {
                 new Put(SKILL + "thaum_warp_ward_+5%.description", "5% de chance de resistir a cada ponto de distorção."),
                 new Put(SKILL + "vis_discount_+2%.description", "2% de desconto de vis."),
                 new Put("/ftb.shopkeeper.locked.arcanist",
-                        "Reúna um pouco de Pó de Vinteum ou carregue um Taumômetro e compartilharei meu estoque."));
+                        "Carregue o Compêndio Arcano, um pouco de Pó de Vinteum ou um Taumômetro e compartilharei meu estoque."));
     }
 
     private static final List<Step> STEPS = buildSteps();
