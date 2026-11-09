@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/wizard_dance_fframes.gif" width="576" alt="Three pixel-art wizards in purple, green and red robes dancing in a moonlit forest, each holding a wand">
+  <a href="https://www.youtube.com/watch?v=qdb2hMzFCCA"><img src="assets/wizard_dance_fframes.gif" width="576" alt="Three pixel-art wizards in purple, green and red robes dancing in a moonlit forest, each holding a wand"></a>
 </p>
 
 # FTB Evolution 2 - Thaumaturge Restore
