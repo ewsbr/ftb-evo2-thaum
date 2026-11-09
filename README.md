@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/wizard_dance_fframes.gif" width="576" alt="Three pixel-art wizards in purple, green and red robes dancing in a moonlit forest, each holding a wand">
+</p>
+
 # FTB Evolution 2 - Thaumaturge Restore
 
 An installer that adds Thaumaturge back to FTB Evolution 2. The nostalgia must not stop.
