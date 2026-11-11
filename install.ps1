@@ -1,10 +1,17 @@
-# Runs the Thaumaturge restore with the first Java 17+ found: JAVA_HOME, PATH, then launcher-bundled runtimes.
+# Runs the Thaumaturge restore with the bundled runtime if present, then the first Java 17+ found:
+# JAVA_HOME, PATH, then launcher-bundled runtimes.
 # All arguments go to the installer; see .\install.cmd --help.
 $ErrorActionPreference = 'Stop'
 
 $jar = Join-Path $PSScriptRoot 'evo2-thaumaturge-restore.jar'
 if (-not (Test-Path -LiteralPath $jar)) { $jar = Join-Path $PSScriptRoot 'dist\evo2-thaumaturge-restore.jar' }
 if (-not (Test-Path -LiteralPath $jar)) { Write-Error "evo2-thaumaturge-restore.jar not found next to $PSCommandPath"; exit 1 }
+
+$bundled = Join-Path $PSScriptRoot 'runtime\bin\java.exe'
+if (Test-Path -LiteralPath $bundled) {
+    & $bundled -jar $jar @args
+    exit $LASTEXITCODE
+}
 
 function Get-JavaMajor([string] $java) {
     $out = & $java -version 2>&1 | Out-String
@@ -37,7 +44,7 @@ foreach ($c in $candidates) {
     if ((Test-Path -LiteralPath $c) -and (Get-JavaMajor $c) -ge 17) { $java = $c; break }
 }
 if (-not $java) {
-    Write-Error 'No Java 17 or newer found. Install one (for example from adoptium.net) or set JAVA_HOME.'
+    Write-Error 'No Java 17 or newer found. Use the JRE 25 package, install Java 17+ (for example from adoptium.net), or set JAVA_HOME.'
     exit 1
 }
 

@@ -14,7 +14,9 @@ public final class Main {
     private static final String USAGE = """
             FTB Evolution 2 Thaumaturge restore
 
-            Usage: java -jar evo2-thaumaturge-restore.jar [options] [INSTANCE]
+            Usage: install.sh [options] [INSTANCE]
+                   install.cmd [options] [INSTANCE]
+                   java -jar evo2-thaumaturge-restore.jar [options] [INSTANCE]
 
             INSTANCE is a launcher instance folder, its .minecraft/minecraft folder, or a server folder.
             Without it, the installer searches the usual Prism, MultiMC, FTB App, CurseForge, Modrinth,
