@@ -17,35 +17,33 @@ import java.util.zip.ZipInputStream;
 
 /** The quest book as a {@link Plan} would leave it, and the problems found in it. */
 final class QuestBook {
-    private static final String CHAPTERS = Sources.QUESTS + "chapters/";
-
     final Map<String, Map<String, Object>> chapters = new LinkedHashMap<>();
     final Map<String, String> questChapter = new HashMap<>();
     final Map<String, Object> lang = new HashMap<>();
     final Set<String> problems = new LinkedHashSet<>();
 
-    static QuestBook load(Plan plan, GameDir game) throws IOException {
+    static QuestBook load(Plan plan) throws IOException {
         QuestBook book = new QuestBook();
         Map<String, Integer> idCount = new HashMap<>();
-        for (String path : jsonFiles(plan, CHAPTERS)) {
+        for (String path : jsonFiles(plan, Quests.CHAPTERS)) {
             Map<String, Object> chapter = parse(plan, path);
             if (chapter == null) continue;
             String name = Json5.str(chapter.get("filename"));
             book.chapters.put(name == null ? path : name, chapter);
             for (Map<String, Object> q : Json5.objects(chapter, "quests")) {
-                book.questChapter.put(Restore.id(q), name);
+                book.questChapter.put(Quests.id(q), name);
             }
             countIds(chapter, idCount);
         }
-        for (String path : jsonFiles(plan, Sources.QUESTS + "reward_tables/")) {
+        for (String path : jsonFiles(plan, Quests.DIR + "reward_tables/")) {
             Map<String, Object> table = parse(plan, path);
             if (table != null) countIds(table, idCount);
         }
-        for (String path : jsonFiles(plan, Sources.QUESTS + "lang/en_us/chapters/")) {
+        for (String path : jsonFiles(plan, Quests.LANG + "chapters/")) {
             Map<String, Object> l = parse(plan, path);
             if (l != null) book.lang.putAll(l);
         }
-        Map<String, Object> chapterLang = parse(plan, Sources.QUESTS + "lang/en_us/chapter.json5");
+        Map<String, Object> chapterLang = parse(plan, Quests.LANG + "chapter.json5");
         if (chapterLang != null) book.lang.putAll(chapterLang);
 
         idCount.forEach((id, n) -> {
@@ -55,12 +53,12 @@ final class QuestBook {
         return book;
     }
 
-    static boolean questExists(Plan plan, GameDir game, String questId) throws IOException {
-        for (String path : jsonFiles(plan, CHAPTERS)) {
+    static boolean questExists(Plan plan, String questId) throws IOException {
+        for (String path : jsonFiles(plan, Quests.CHAPTERS)) {
             Map<String, Object> chapter = parse(plan, path);
             if (chapter == null) continue;
             for (Map<String, Object> q : Json5.objects(chapter, "quests")) {
-                if (questId.equals(Restore.id(q))) return true;
+                if (questId.equals(Quests.id(q))) return true;
             }
         }
         return false;
@@ -70,49 +68,48 @@ final class QuestBook {
         return questChapter.size();
     }
 
-    /** Problems specific to the restored content. */
-    List<String> restoredProblems(Plan plan, boolean pyramid) throws IOException {
+    /** Problems specific to the restored content. {@code modJars} maps each restored mod to the jar providing it. */
+    List<String> restoredProblems(Plan plan, boolean pyramid, Map<String, String> modJars) throws IOException {
         List<String> out = new ArrayList<>();
-        Map<String, Object> thaum = chapters.get("thaumaturge");
+        Map<String, Object> thaum = chapters.get(Quests.THAUMATURGE);
         if (thaum == null) {
             out.add("thaumaturge chapter is missing");
         } else {
             for (Map<String, Object> q : Json5.objects(thaum, "quests")) {
-                if (!lang.containsKey("quest." + Restore.id(q) + ".title")) {
-                    out.add("thaumaturge quest " + Restore.id(q) + " has no title text");
+                if (!lang.containsKey("quest." + Quests.id(q) + ".title")) {
+                    out.add("thaumaturge quest " + Quests.id(q) + " has no title text");
                 }
             }
         }
-        for (String id : Restore.APPLIED_QUEST_IDS) {
-            if (!"general_storage".equals(questChapter.get(id))) out.add("Applied quest " + id + " is missing");
+        for (String id : Quests.APPLIED_QUEST_IDS) {
+            if (!Quests.GENERAL_STORAGE.equals(questChapter.get(id))) out.add("Applied quest " + id + " is missing");
             else if (!lang.containsKey("quest." + id + ".title")) out.add("Applied quest " + id + " has no title text");
         }
-        if (!"Thaumaturge".equals(Json5.str(lang.get("chapter." + Restore.THAUMATURGE_CHAPTER_ID + ".title")))) {
+        if (!"Thaumaturge".equals(Json5.str(lang.get("chapter." + Quests.THAUMATURGE_CHAPTER_ID + ".title")))) {
             out.add("Thaumaturge chapter title is missing");
         }
 
         Set<String> itemIds = new TreeSet<>();
         if (thaum != null) collectItemIds(thaum.get("quests"), itemIds);
-        Map<String, Object> storage = chapters.get("general_storage");
+        Map<String, Object> storage = chapters.get(Quests.GENERAL_STORAGE);
         if (storage != null) {
             for (Map<String, Object> q : Json5.objects(storage, "quests")) {
-                if (Restore.APPLIED_QUEST_IDS.contains(Restore.id(q))) collectItemIds(q, itemIds);
+                if (Quests.APPLIED_QUEST_IDS.contains(Quests.id(q))) collectItemIds(q, itemIds);
             }
         }
-        Map<String, Object> pyramidChapter = chapters.get("pyramid_challenge");
+        Map<String, Object> pyramidChapter = chapters.get(Quests.PYRAMID);
         if (pyramid && pyramidChapter != null) {
-            Map<String, Object> rune = Restore.byId(Json5.objects(pyramidChapter, "quests")).get(Restore.RUNE_CARVING_ID);
+            Map<String, Object> rune = Quests.byId(Json5.objects(pyramidChapter, "quests")).get(Quests.RUNE_CARVING_ID);
             if (rune != null) collectItemIds(rune, itemIds);
         }
-        Set<String> known = new TreeSet<>();
-        known.addAll(registeredIds(plan, "mods/" + Sources.THAUMATURGE_PATCHED_NAME, "thaumaturge"));
-        known.addAll(registeredIds(plan, "mods/" + Sources.APPLIED_NAME, "appliedthaumaturge"));
-        if (!known.isEmpty()) {
-            for (String id : itemIds) {
-                String ns = id.substring(0, id.indexOf(':'));
-                if ((ns.equals("thaumaturge") || ns.equals("appliedthaumaturge")) && !known.contains(id)) {
-                    out.add("quest item " + id + " is not in the installed jars");
-                }
+        Map<String, Set<String>> known = new HashMap<>();
+        for (Map.Entry<String, String> jar : modJars.entrySet()) {
+            known.put(jar.getKey(), registeredIds(plan, jar.getValue(), jar.getKey()));
+        }
+        for (String id : itemIds) {
+            Set<String> ids = known.get(id.substring(0, id.indexOf(':')));
+            if (ids != null && !ids.isEmpty() && !ids.contains(id)) {
+                out.add("quest item " + id + " is not in " + modJars.get(id.substring(0, id.indexOf(':'))));
             }
         }
         return out;
@@ -123,14 +120,14 @@ final class QuestBook {
             for (Map<String, Object> q : Json5.objects(c.getValue(), "quests")) {
                 for (Object dep : Json5.arr(q.getOrDefault("dependencies", List.of()))) {
                     if (!questChapter.containsKey(Json5.str(dep))) {
-                        problems.add(c.getKey() + ": quest " + Restore.id(q) + " depends on missing " + Json5.str(dep));
+                        problems.add(c.getKey() + ": quest " + Quests.id(q) + " depends on missing " + Json5.str(dep));
                     }
                 }
             }
             for (Map<String, Object> link : Json5.objects(c.getValue(), "quest_links")) {
                 String target = Json5.str(link.get("linked_quest"));
                 if (!questChapter.containsKey(target)) {
-                    problems.add(c.getKey() + ": link " + Restore.id(link) + " points at missing " + target);
+                    problems.add(c.getKey() + ": link " + Quests.id(link) + " points at missing " + target);
                 }
             }
         }

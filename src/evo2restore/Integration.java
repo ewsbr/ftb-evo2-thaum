@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
  * Content the newer pack redesigned on purpose, such as cinnabar now yielding FTB Materials gems, stays.
  */
 final class Integration {
-    sealed interface Op permits AddItems, AddKeys, AddValues, Revert, Put {}
+    sealed interface Op permits AddItems, AddKeys, AddValues, Revert, RevertStandIn, Put {}
 
     /** Adds the old array's Thaumaturge elements; {@code idPath} is the dotted field that identifies an element. */
     record AddItems(String pointer, String idPath, boolean freshIds) implements Op {
@@ -44,17 +44,32 @@ final class Integration {
     /** Sets the value to the old one. */
     record Revert(String pointer) implements Op {}
 
+    /**
+     * Puts the old array's one Thaumaturge element back in place of the stand-in the newer pack used. Elements are
+     * compared by {@code field}, or whole when it is null; a field revert keeps the rest of the element, such as a
+     * newer count. The stand-in is an element 1.0.0 did not have; see {@link #standIn} for how one is chosen.
+     */
+    record RevertStandIn(String pointer, String field) implements Op {}
+
     /** Sets a string value written for this restore. */
     record Put(String pointer, String value) implements Op {}
 
     private interface Step {
         void plan(Integration in, Plan plan) throws IOException, InterruptedException;
+
+        /** The 1.0.0 files this step reads from {@link IntegrationSources#OLD}. */
+        List<String> sources();
     }
 
     private record JsonStep(String path, List<Op> ops) implements Step {
         @Override
         public void plan(Integration in, Plan plan) throws IOException, InterruptedException {
             in.json(plan, path, ops);
+        }
+
+        @Override
+        public List<String> sources() {
+            return ops.stream().anyMatch(Integration::needsOld) ? List.of(path) : List.of();
         }
     }
 
@@ -63,12 +78,22 @@ final class Integration {
         public void plan(Integration in, Plan plan) throws IOException, InterruptedException {
             in.lines(plan, path);
         }
+
+        @Override
+        public List<String> sources() {
+            return List.of(path);
+        }
     }
 
     private record TomlListStep(String path, String key, UnaryOperator<String> fix) implements Step {
         @Override
         public void plan(Integration in, Plan plan) throws IOException, InterruptedException {
             in.tomlList(plan, path, key, fix);
+        }
+
+        @Override
+        public List<String> sources() {
+            return List.of(path);
         }
     }
 
@@ -82,6 +107,11 @@ final class Integration {
         public void plan(Integration in, Plan plan) throws IOException, InterruptedException {
             if (skipIf != null && plan.readText(skipIf).map(t -> t.contains(marker)).orElse(false)) return;
             in.file(plan, path, source);
+        }
+
+        @Override
+        public List<String> sources() {
+            return List.of(source == null ? path : source);
         }
     }
 
@@ -162,10 +192,10 @@ final class Integration {
                 List.of(new AddItems("/variants", null), new AddValues("/variants", List.of("thaumaturge:ore_cinnabar")))));
         s.add(new JsonStep(FTB + "hostilenetworks/hostilenetworks/data_models/blocks/nether_quartz_ore.json",
                 List.of(new AddItems("/variants", null))));
-        s.add(new JsonStep(FTB + "bhc/recipe/blade_of_vitality.json", List.of(new Revert("/fluids/0"))));
-        s.add(new JsonStep(FTB + "bhc/recipe/vigor_bow.json", List.of(new Revert("/fluids/0"))));
+        s.add(new JsonStep(FTB + "bhc/recipe/blade_of_vitality.json", List.of(new RevertStandIn("/fluids", null))));
+        s.add(new JsonStep(FTB + "bhc/recipe/vigor_bow.json", List.of(new RevertStandIn("/fluids", null))));
         s.add(new JsonStep(FTB + "ftb/recipe/fabricating/causal_anchor.json",
-                List.of(new Revert("/ingredients/4/ingredient"))));
+                List.of(new RevertStandIn("/ingredients", "ingredient"))));
         s.add(new JsonStep(SKILLS, skillOps()));
         s.add(new JsonStep("kubejs/assets/ftb/lang/en_us.json", englishSkillText()));
         s.add(new JsonStep("kubejs/assets/ftb/lang/pt_br.json", portugueseSkillText()));
@@ -222,14 +252,28 @@ final class Integration {
         this.downloader = downloader;
     }
 
+    private static final String KEYBIND_SOURCE = "configureddefaults/options.txt";
+
+    /** Every 1.0.0 file the steps read. */
+    static List<String> sourcePaths() {
+        List<String> out = new ArrayList<>();
+        for (Step step : STEPS) out.addAll(step.sources());
+        out.add(KEYBIND_SOURCE);
+        return out;
+    }
+
     void plan(Plan plan) throws IOException, InterruptedException {
         for (Step step : STEPS) step.plan(this, plan);
         keybinds(plan);
     }
 
-    private String old(String path) throws IOException, InterruptedException {
+    private byte[] oldBytes(String path) throws IOException, InterruptedException {
         Sources.Remote r = Objects.requireNonNull(IntegrationSources.OLD.get(path), path);
-        return new String(downloader.fetch(r.url(), r.sha1()), StandardCharsets.UTF_8);
+        return downloader.fetch(r.url(), r.sha1());
+    }
+
+    private String old(String path) throws IOException, InterruptedException {
+        return new String(oldBytes(path), StandardCharsets.UTF_8);
     }
 
     private void json(Plan plan, String path, List<Op> ops) throws IOException, InterruptedException {
@@ -240,18 +284,22 @@ final class Integration {
         }
         Json5Doc doc = Json5Doc.parse(text.get(), !path.endsWith(".json5"));
         Object cur = doc.root();
-        boolean needsOld = ops.stream().anyMatch(o -> o instanceof AddItems || o instanceof AddKeys || o instanceof Revert);
-        Object old = needsOld ? Json5.parse(old(path)) : null;
+        Object old = ops.stream().anyMatch(Integration::needsOld) ? Json5.parse(old(path)) : null;
         String before = Json5.writeJson(cur);
         for (Op op : ops) {
             if (op instanceof AddItems a) addItems(doc, old, a, path);
             else if (op instanceof AddKeys a) addKeys(doc, old, a.pointer(), path);
             else if (op instanceof AddValues a) addValues(doc, a, path);
             else if (op instanceof Revert r) set(doc, r.pointer(), resolve(old, r.pointer()), path);
+            else if (op instanceof RevertStandIn r) revertStandIn(doc, old, r, path);
             else if (op instanceof Put p) set(doc, p.pointer(), Json5.Str.of(p.value()), path);
         }
         if (Json5.writeJson(cur).equals(before)) return;
         plan.writeText(path, doc.render(), "1.0.0 Thaumaturge integration");
+    }
+
+    private static boolean needsOld(Op o) {
+        return !(o instanceof AddValues || o instanceof Put);
     }
 
     private void addItems(Json5Doc doc, Object old, AddItems op, String path) {
@@ -346,6 +394,67 @@ final class Integration {
         }
     }
 
+    void revertStandIn(Json5Doc doc, Object old, RevertStandIn op, String path) {
+        if (!(resolve(old, op.pointer()) instanceof List<?> o) || !(resolve(doc.root(), op.pointer()) instanceof List<?> c)) {
+            notes.add("skipped " + path + op.pointer() + ": structure changed");
+            return;
+        }
+        List<Object> oldList = Json5.arr(o);
+        List<Object> curList = Json5.arr(c);
+        List<String> oldKeys = oldList.stream().map(v -> Json5.writeJson(slot(v, op.field()))).toList();
+        List<Integer> thaum = new ArrayList<>();
+        for (int i = 0; i < oldList.size(); i++) if (isThaum(slot(oldList.get(i), op.field()))) thaum.add(i);
+        if (thaum.size() != 1) {
+            notes.add("skipped " + path + op.pointer() + ": the 1.0.0 file has no single Thaumaturge entry");
+            return;
+        }
+        int from = thaum.get(0);
+        List<Integer> standIns = new ArrayList<>();
+        for (int i = 0; i < curList.size(); i++) {
+            String key = Json5.writeJson(slot(curList.get(i), op.field()));
+            if (key.equals(oldKeys.get(from))) return;
+            if (!oldKeys.contains(key)) standIns.add(i);
+        }
+        int to = standIn(standIns, curList, oldList.get(from), op.field(), from);
+        if (to < 0) {
+            notes.add("skipped " + path + op.pointer() + ": no single entry stands in for " + oldKeys.get(from));
+            return;
+        }
+        if (op.field() == null) {
+            Object copy = Json5.deepCopy(oldList.get(from));
+            doc.replaced(curList.get(to), copy);
+            curList.set(to, copy);
+        } else if (curList.get(to) instanceof Map<?, ?> m) {
+            Map<String, Object> entry = Json5.obj(m);
+            Object copy = Json5.deepCopy(slot(oldList.get(from), op.field()));
+            doc.replaced(entry.get(op.field()), copy);
+            entry.put(op.field(), copy);
+        }
+    }
+
+    /** The only candidate, else the one whose other fields match the old entry's, else the one at its index. */
+    private static int standIn(List<Integer> candidates, List<Object> cur, Object oldEntry, String field, int from) {
+        if (candidates.size() == 1) return candidates.get(0);
+        if (field != null) {
+            List<Integer> alike = candidates.stream().filter(i -> sameExcept(cur.get(i), oldEntry, field)).toList();
+            if (alike.size() == 1) return alike.get(0);
+        }
+        return candidates.contains(from) ? from : -1;
+    }
+
+    private static boolean sameExcept(Object a, Object b, String field) {
+        if (!(a instanceof Map<?, ?> ma) || !(b instanceof Map<?, ?> mb)) return false;
+        Map<String, Object> x = new LinkedHashMap<>(Json5.obj(ma));
+        Map<String, Object> y = new LinkedHashMap<>(Json5.obj(mb));
+        x.remove(field);
+        y.remove(field);
+        return Json5.writeJson(x).equals(Json5.writeJson(y));
+    }
+
+    private static Object slot(Object element, String field) {
+        return field == null ? element : child(element, field);
+    }
+
     private void lines(Plan plan, String path) throws IOException, InterruptedException {
         Optional<String> text = plan.readText(path);
         if (text.isEmpty()) {
@@ -397,8 +506,7 @@ final class Integration {
 
     private void file(Plan plan, String path, String source) throws IOException, InterruptedException {
         if (plan.read(path).isPresent()) return;
-        Sources.Remote r = IntegrationSources.OLD.get(source == null ? path : source);
-        plan.write(path, downloader.fetch(r.url(), r.sha1()), "from FTB Evolution 2 1.0.0");
+        plan.write(path, oldBytes(source == null ? path : source), "from FTB Evolution 2 1.0.0");
     }
 
     // Matches an options.txt key binding:  key_key.thaumaturge.change_focus:key.keyboard.f:CONTROL
@@ -412,7 +520,7 @@ final class Integration {
         Optional<String> text = plan.readText("options.txt");
         if (text.isEmpty()) return;
         Map<String, String> pack = new LinkedHashMap<>();
-        for (String l : old("configureddefaults/options.txt").split("\r?\n")) {
+        for (String l : old(KEYBIND_SOURCE).split("\r?\n")) {
             Matcher m = KEY_LINE.matcher(l);
             if (m.matches() && isThaum(m.group(1))) pack.put(m.group(1), m.group(2));
         }

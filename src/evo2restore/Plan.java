@@ -27,6 +27,7 @@ import java.util.stream.Stream;
 final class Plan {
     static final String STATE_DIR = "thaumaturge-restore";
     private static final String JOURNAL = "journal.json";
+    private static final String PRESENT = "present";
 
     private final GameDir game;
     private final Map<String, byte[]> writes = new LinkedHashMap<>();
@@ -96,9 +97,10 @@ final class Plan {
         for (String path : removals) out.printf("  %-8s %s%n           %s%n", "disable", path, reasons.get(path));
     }
 
-    void apply() throws IOException {
+    void apply(PrintStream out) throws IOException {
         String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
         Path dir = game.resolve(STATE_DIR).resolve(stamp);
+        for (int n = 2; Files.exists(dir); n++) dir = game.resolve(STATE_DIR).resolve(String.format("%s-%02d", stamp, n));
         Path backup = dir.resolve("backup");
         Files.createDirectories(backup);
 
@@ -110,7 +112,7 @@ final class Plan {
             java.util.Collections.reverse(missing);
             created.addAll(missing);
         }
-        for (Path d : created) entries.add(entry("mkdir", rel(d), null, null));
+        for (Path d : created) entries.add(entry("mkdir", game.relative(d), null, null));
         for (Map.Entry<String, byte[]> w : writes.entrySet()) {
             Path target = game.resolve(w.getKey());
             String before = null;
@@ -131,7 +133,7 @@ final class Plan {
             for (Map.Entry<String, byte[]> w : writes.entrySet()) atomicWrite(game.resolve(w.getKey()), w.getValue());
             for (String path : removals) move(game.resolve(path), backup.resolve(path));
         } catch (IOException e) {
-            List<String> left = revert(game, dir, System.out);
+            List<String> left = revert(game, dir, new java.util.HashMap<>(), out);
             try (Stream<Path> s = Files.list(dir.getParent())) {
                 if (s.findAny().isEmpty()) Files.delete(dir.getParent());
             }
@@ -154,9 +156,10 @@ final class Plan {
                     .sorted(Comparator.comparing(Path::getFileName).reversed())
                     .toList();
         }
+        Map<String, String> settled = new java.util.HashMap<>();
         for (Path run : runs) {
             out.println("Reverting install " + run.getFileName());
-            skipped.addAll(revert(game, run, out));
+            skipped.addAll(revert(game, run, settled, out));
         }
         try (Stream<Path> s = Files.list(state)) {
             if (s.findAny().isEmpty()) Files.delete(state);
@@ -164,8 +167,15 @@ final class Plan {
         return skipped;
     }
 
-    /** Reverts one journal and deletes its folder, unless some files changed since; those are returned. */
-    private static List<String> revert(GameDir game, Path run, PrintStream out) throws IOException {
+    /**
+     * Reverts one journal and deletes its folder, unless some files changed since; those are returned.
+     *
+     * {@code settled} carries what newer journals put back: a file's hash, or {@link #PRESENT} for a disabled path
+     * that was moved back. A newer install that started from different content than this one left means the pack
+     * updated the path in between, so the newer journal's original is current and this journal's backup is stale.
+     */
+    private static List<String> revert(GameDir game, Path run, Map<String, String> settled, PrintStream out)
+            throws IOException {
         Map<String, Object> journal = Json5.obj(Json5.parse(Files.readString(run.resolve(JOURNAL))));
         List<Object> entries = new ArrayList<>(Json5.arr(journal.get("entries")));
         java.util.Collections.reverse(entries);
@@ -182,17 +192,29 @@ final class Plan {
             if ("remove".equals(Json5.str(e.get("op")))) {
                 if (!Files.exists(saved)) continue;
                 if (Files.exists(target)) {
-                    runSkipped.add(path + " (exists again, backup kept)");
+                    if (PRESENT.equals(settled.get(path))) {
+                        out.println("  current  " + path + " (the pack updated it after this install)");
+                    } else {
+                        runSkipped.add(path + " (exists again, backup kept)");
+                    }
                     continue;
                 }
                 move(saved, target);
+                settled.put(path, PRESENT);
                 out.println("  restored " + path);
                 continue;
             }
             String before = Json5.str(e.get("before"));
             String after = Json5.str(e.get("after"));
             String current = Files.isRegularFile(target) ? Hashes.sha1(Files.readAllBytes(target)) : null;
-            if (current == null ? before == null : current.equals(before)) continue;
+            if (current == null ? before == null : current.equals(before)) {
+                if (before != null) settled.put(path, before);
+                continue;
+            }
+            if (current != null && current.equals(settled.get(path)) && !current.equals(after)) {
+                out.println("  current  " + path + " (the pack updated it after this install)");
+                continue;
+            }
             if (current == null || !current.equals(after)) {
                 runSkipped.add(path + " (changed since install)");
                 continue;
@@ -202,6 +224,7 @@ final class Plan {
                 out.println("  deleted  " + path);
             } else {
                 atomicWrite(target, Files.readAllBytes(saved));
+                settled.put(path, before);
                 out.println("  restored " + path);
             }
         }
@@ -251,10 +274,6 @@ final class Plan {
     private static void move(Path from, Path to) throws IOException {
         Files.createDirectories(to.getParent());
         Files.move(from, to);
-    }
-
-    private String rel(Path p) {
-        return game.root().relativize(p).toString().replace('\\', '/');
     }
 
     private static boolean isEmptyDir(Path dir) throws IOException {

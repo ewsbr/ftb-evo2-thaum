@@ -18,6 +18,10 @@ java_major() {
 candidates=()
 [ -n "${JAVA_HOME:-}" ] && candidates+=("$JAVA_HOME/bin/java")
 command -v java >/dev/null 2>&1 && candidates+=("$(command -v java)")
+if [ -x /usr/libexec/java_home ]; then
+  home="$(/usr/libexec/java_home -v 17+ 2>/dev/null || true)"
+  [ -n "$home" ] && candidates+=("$home/bin/java")
+fi
 shopt -s nullglob
 for j in \
   "$HOME"/.local/share/PrismLauncher/java/*/bin/java \
@@ -26,7 +30,15 @@ for j in \
   "$HOME"/.ftba/runtime/*/bin/java \
   "$HOME"/.minecraft/runtime/java-runtime-*/linux/java-runtime-*/bin/java \
   "$HOME"/.local/share/ModrinthApp/meta/java_versions/*/bin/java \
-  /usr/lib/jvm/*/bin/java; do
+  /usr/lib/jvm/*/bin/java \
+  "$HOME"/Library/Application\ Support/PrismLauncher/java/*/bin/java \
+  "$HOME"/Library/Application\ Support/PrismLauncher/java/*/Contents/Home/bin/java \
+  "$HOME"/Library/Application\ Support/.ftba/bin/runtime/*/bin/java \
+  "$HOME"/Library/Application\ Support/.ftba/bin/runtime/*/Contents/Home/bin/java \
+  "$HOME"/Library/Application\ Support/minecraft/runtime/java-runtime-*/mac-os*/java-runtime-*/jre.bundle/Contents/Home/bin/java \
+  "$HOME"/Library/Application\ Support/ModrinthApp/meta/java_versions/*/bin/java \
+  "$HOME"/Library/Application\ Support/ModrinthApp/meta/java_versions/*/Contents/Home/bin/java \
+  /Library/Java/JavaVirtualMachines/*/Contents/Home/bin/java; do
   candidates+=("$j")
 done
 shopt -u nullglob

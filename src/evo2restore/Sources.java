@@ -11,7 +11,7 @@ final class Sources {
 
     private static final String BLOB = "https://files.feed-the-beast.com/blob/";
 
-    private static Remote blob(String hash, String ext, String sha1) {
+    static Remote blob(String hash, String ext, String sha1) {
         return new Remote(BLOB + hash.substring(0, 2) + "/" + hash + "." + ext, sha1);
     }
 
@@ -38,15 +38,14 @@ final class Sources {
             "49efa75531dbce96da49f8f99410d445439c21563870c7bc07be99b1e59857eb", "json5",
             "be2ed6d795ad75620330fd8e434e69ed792a2682");
 
-    static final String QUESTS = "config/ftbquests/quests/";
     static final String RECIPES = "datapacks/ftb/data/ftb/recipe/feed_the_beast/";
     static final String TEXTURES = "kubejs/assets/ftb/textures/quests/";
 
     static final List<Copied> COPIED = List.of(
-            new Copied(QUESTS + "chapters/thaumaturge.json5", blob(
+            new Copied(Quests.chapter(Quests.THAUMATURGE), blob(
                     "b6cccda7db667d21c3468f9a8755104fbfdf1ca3ebe0aadc43bd6c7b310c85b0", "json5",
                     "12fd98bebbcf2c4ef43b48caae1965bc41def622")),
-            new Copied(QUESTS + "lang/en_us/chapters/thaumaturge.json5", blob(
+            new Copied(Quests.chapterLang(Quests.THAUMATURGE), blob(
                     "ee5d14bf75a2701d19b385b7890be7cbd068d19eb7f58edc3cc73b400a85a4c6", "json5",
                     "4d200a428f0c316394707dd2fd3e37f05aca59d5")),
             // 1.0.0 shipped this as rune_plate.json. Newer packs use that name for the Witchery recipe.

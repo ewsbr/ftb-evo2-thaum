@@ -25,6 +25,11 @@ record GameDir(Path root, Path instance, String launcher, String name, String pa
         return root.resolve(relative);
     }
 
+    /** The path relative to the game directory, with forward slashes on every OS. */
+    String relative(Path p) {
+        return root.relativize(p).toString().replace('\\', '/');
+    }
+
     String describe() {
         return String.format("%s [%s] pack %s, Minecraft %s%n    %s", name, launcher,
                 packVersion == null ? "unknown" : packVersion + (packVersionId == null ? "" : " (" + packVersionId + ")"),
@@ -74,9 +79,8 @@ record GameDir(Path root, Path instance, String launcher, String name, String pa
     }
 
     private static boolean isEvolution2(Path gameDir) {
-        Path chapters = gameDir.resolve(Sources.QUESTS + "chapters");
-        return Files.isRegularFile(chapters.resolve("general_storage.json5"))
-                && Files.isRegularFile(chapters.resolve("pyramid_challenge.json5"))
+        return Files.isRegularFile(gameDir.resolve(Quests.chapter(Quests.GENERAL_STORAGE)))
+                && Files.isRegularFile(gameDir.resolve(Quests.chapter(Quests.PYRAMID)))
                 && Files.isDirectory(gameDir.resolve("mods"));
     }
 
