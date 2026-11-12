@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Runs the Thaumaturge restore with the bundled runtime if present, then the first Java 17+ found:
-# JAVA_HOME, PATH, then launcher-bundled runtimes.
+# Runs the Thaumaturge restore with the first Java 17+ found: JAVA_HOME, PATH, then launcher-bundled runtimes.
 # All arguments go to the installer; see ./install.sh --help.
 set -euo pipefail
 
@@ -10,11 +9,6 @@ jar="$here/evo2-thaumaturge-restore.jar"
 if [ ! -f "$jar" ]; then
   echo "error: evo2-thaumaturge-restore.jar not found next to $0" >&2
   exit 1
-fi
-
-bundled="$here/runtime/bin/java"
-if [ -x "$bundled" ]; then
-  exec "$bundled" -jar "$jar" "$@"
 fi
 
 java_major() {
@@ -49,8 +43,7 @@ done
 
 if [ -z "$java" ]; then
   echo "error: no Java 17 or newer found." >&2
-  echo "Use the JRE 25 package, install Java 17+ (for example: sudo apt install openjdk-21-jre-headless)," >&2
-  echo "or set JAVA_HOME." >&2
+  echo "Install one (for example: sudo apt install openjdk-21-jre-headless) or set JAVA_HOME." >&2
   exit 1
 fi
 
