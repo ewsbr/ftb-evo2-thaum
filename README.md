@@ -14,29 +14,15 @@ into later pack versions, without losing the later improvements and fixes.
 
 This is a hack that took several manual patches. I hope FTB manages to reintegrate Thaumaturge into the pack.
 
-## Download
-
-Two variants are published on the [releases page](https://github.com/ewsbr/ftb-evo2-thaum/releases):
-
-- **JRE 25 package** (`evo2-thaumaturge-restore-<version>-jre25-<os>-<arch>.tar.gz` or `.zip`): includes Eclipse
-  Temurin JRE 25 and needs no Java installation. Pick the package for your OS and CPU.
-- **Plain jar** (`evo2-thaumaturge-restore.jar`): uses Java 17 or newer from the system or a Minecraft launcher.
-
-Both variants run the same installer and make the same changes. The JRE variant has one package per platform:
-Linux x86-64 and AArch64, Windows x86-64, and macOS x86-64 and Apple Silicon. Release checksums are in
-`SHA256SUMS`.
-
 ## Requirements
 
 - FTB Evolution 2 **1.0.1 or later** on Minecraft 26.1.2.
-- The **JRE 25 package**, or **Java 17 or newer** for the plain jar. Minecraft launchers ship a Java runtime, and
-  the install scripts locate it.
+- Java 17 or newer. Minecraft launchers ship a Java runtime, and the install scripts locate it.
 - An internet connection on first run. Mods and pack files are downloaded from the FTB and CurseForge CDNs.
 
 ## Quick start
 
-Close the game. If you downloaded a JRE 25 package, unpack it first. Then run the script for your system from the
-folder that contains the jar:
+Close the game, then run the script for your system from the folder that contains the jar:
 
 ```bash
 ./install.sh            # Linux and macOS
@@ -131,18 +117,15 @@ Windows and macOS support is implemented but has not been tested yet. Reports ar
 
 ## Building
 
-Requires JDK 17+ and `curl`. Packaging also needs `tar`, `unzip` and `zip`, and either `sha256sum` or `shasum`.
+Requires JDK 17+ and `curl`.
 
 ```bash
 ./build.sh                                              # writes dist/evo2-thaumaturge-restore.jar
 java -cp dist/evo2-thaumaturge-restore.jar test/Json5Test.java
-./package.sh                                            # writes dist/release/
 ```
 
-`./package.sh` writes both release builds to `dist/release/`: the plain jar with its scripts, and one JRE 25 package
-per supported platform. It downloads the pinned Temurin JRE 25 archives and verifies their SHA-256 hashes. Set
-`PLATFORMS_ONLY="linux-x64"` to build a single package while testing, or `VERSION=...` to override the version in
-the artifact names.
+To package a release, put `dist/evo2-thaumaturge-restore.jar`, `install.sh`, `install.cmd` and `install.ps1` in a
+single folder.
 
 ## Pack decisions
 
@@ -224,6 +207,4 @@ later version redesigned keeps that redesign.
 Thaumaturge is by Leclowndu93150 and contributors. FTB Evolution 2 is by the Feed The Beast team. This project is not
 affiliated with either.
 
-The jar bundles [ASM](https://asm.ow2.io/) 9.9.1, distributed under the BSD license in `LICENSE-ASM.txt`. The JRE 25
-packages bundle Eclipse Temurin 25, distributed under the GPLv2 with the Classpath Exception; its notices are in
-`runtime/legal/`.
+The jar bundles [ASM](https://asm.ow2.io/) 9.9.1, distributed under the BSD license in `LICENSE-ASM.txt`.
