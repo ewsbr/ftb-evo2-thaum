@@ -146,6 +146,7 @@ final class Restore {
             Path p = game.resolve(c.path());
             if (Files.isRegularFile(p) && Hashes.sha1(Files.readAllBytes(p)).equals(c.remote().sha1())) continue;
             if (c.path().startsWith(CHAPTERS) && Files.isRegularFile(p)) {
+                if (sameChapterIgnoringOrder(Files.readString(p), fetch(c.remote()))) continue;
                 warnings.add(c.path() + " exists with other content; replacing it with the 1.0.0 chapter");
             }
             plan.write(c.path(), fetch(c.remote()), "from FTB Evolution 2 1.0.0");
@@ -159,6 +160,19 @@ final class Restore {
         if ("Thaumaturge".equals(Json5.str(lang.get(key)))) return;
         lang.put(key, Json5.Str.of("Thaumaturge"));
         plan.writeText(path, Json5.write(lang), "Thaumaturge chapter title");
+    }
+
+    /** True when the chapter differs from 1.0.0's only in the order_index that {@link #chapterOrder} sets. */
+    private static boolean sameChapterIgnoringOrder(String installed, byte[] original) {
+        try {
+            Map<String, Object> a = Json5.obj(Json5.parse(installed));
+            Map<String, Object> b = Json5.obj(Json5.parse(new String(original, StandardCharsets.UTF_8)));
+            a.remove("order_index");
+            b.remove("order_index");
+            return a.equals(b);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     /** Places Thaumaturge right before Witchery in its chapter group, as in 1.0.0. */
@@ -184,7 +198,9 @@ final class Restore {
                 .filter(c -> "witchery".equals(Json5.str(c.json().get("filename"))))
                 .findFirst().orElse(null);
         boolean thaumChanged = false;
-        if (witchery != null && order >= witchery.order()) {
+        final double current = order;
+        if (witchery != null && (current >= witchery.order() || others.stream()
+                .anyMatch(c -> c.order() >= current && c.order() < witchery.order()))) {
             order = witchery.order();
             thaum.put("order_index", new Json5.Num(Long.toString((long) order)));
             thaumChanged = true;

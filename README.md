@@ -126,7 +126,7 @@ the built jar.
 
 ## Compatibility
 
-Tested on every FTB Evolution 2 release from 1.0.1-rc.1 to 1.8.1, including a dedicated server boot on 1.8.1.
+Tested on every FTB Evolution 2 release from 1.0.1-rc.1 to 1.9.0, including dedicated server boots on 1.8.1 and 1.9.0.
 Windows and macOS support is implemented but has not been tested yet. Reports are welcome.
 
 ## Building
