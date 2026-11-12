@@ -121,7 +121,7 @@ Requires JDK 17+ and `curl`.
 
 ```bash
 ./build.sh                                              # writes dist/evo2-thaumaturge-restore.jar
-java -cp dist/evo2-thaumaturge-restore.jar test/Json5Test.java
+./test.sh                                               # runs the tests
 ```
 
 To package a release, put `dist/evo2-thaumaturge-restore.jar`, `install.sh`, `install.cmd` and `install.ps1` in a

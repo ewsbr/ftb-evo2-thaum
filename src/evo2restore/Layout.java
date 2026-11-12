@@ -28,7 +28,7 @@ final class Layout {
     static double offset(List<Map<String, Object>> placed, Map<String, Object> chapter, Set<String> presentIds) {
         List<Box> moving = new ArrayList<>();
         for (Map<String, Object> o : placed) {
-            if (!presentIds.contains(Restore.id(o))) moving.add(box(o, chapter));
+            if (!presentIds.contains(Quests.id(o))) moving.add(box(o, chapter));
         }
         List<Box> fixed = new ArrayList<>();
         for (String list : List.of("quests", "images", "quest_links")) {

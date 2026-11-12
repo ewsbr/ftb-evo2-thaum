@@ -112,7 +112,7 @@ public final class Main {
             return skipped.isEmpty() ? 0 : 2;
         }
 
-        checkVersion(game, force);
+        checkVersion(game, force, out);
         if (!force && shipsThaumaturge(game)) {
             throw new Failure("this install already ships Thaumaturge and the Applied quests, like pack 1.0.0;"
                     + " this restore is for 1.0.1 and later (--force to continue)");
@@ -121,11 +121,11 @@ public final class Main {
         Restore restore = new Restore(game, new Downloader(cache, offline), new Restore.Options(pyramid, integration), out);
         Plan plan = restore.plan();
 
-        QuestBook before = QuestBook.load(new Plan(game), game);
-        QuestBook after = QuestBook.load(plan, game);
+        QuestBook before = QuestBook.load(new Plan(game));
+        QuestBook after = QuestBook.load(plan);
         List<String> introduced = new ArrayList<>(after.problems);
         introduced.removeAll(before.problems);
-        introduced.addAll(after.restoredProblems(plan, pyramid));
+        introduced.addAll(after.restoredProblems(plan, pyramid, restore.modJars));
 
         for (String n : restore.notes) out.println("note: " + n);
         for (String w : restore.warnings) out.println("warning: " + w);
@@ -146,14 +146,14 @@ public final class Main {
             return 0;
         }
         if (!yes && !confirm(out, "Close the game first. Apply these changes?")) return 1;
-        plan.apply();
+        plan.apply(out);
         out.println("Done. Backups and the uninstall journal are in " + game.resolve(Plan.STATE_DIR));
         out.println("Start the game once. FTB Quests should report " + after.chapters.size() + " chapters and "
                 + after.questCount() + " quests in logs/latest.log.");
         return 0;
     }
 
-    private static void checkVersion(GameDir game, boolean force) throws Failure {
+    private static void checkVersion(GameDir game, boolean force, PrintStream out) throws Failure {
         List<String> issues = new ArrayList<>();
         if (game.packVersionId() != null && NATIVE_THAUMATURGE_VERSIONS.contains(game.packVersionId())) {
             throw new Failure("pack " + game.packVersion() + " already ships Thaumaturge; this restore is for 1.0.1 and later");
@@ -164,7 +164,7 @@ public final class Main {
         }
         if (issues.isEmpty()) return;
         if (!force) throw new Failure(String.join("; ", issues) + " (--force to continue)");
-        issues.forEach(i -> System.out.println("warning: " + i));
+        issues.forEach(i -> out.println("warning: " + i));
     }
 
     /** A pack that still has Thaumaturge: the Applied quests and a Thaumaturge jar this installer did not write. */
@@ -173,7 +173,7 @@ public final class Main {
         boolean foreignJar = ModJar.scan(game.resolve("mods")).stream()
                 .anyMatch(j -> j.declares("thaumaturge")
                         && !j.path().getFileName().toString().equals(Sources.THAUMATURGE_PATCHED_NAME));
-        return foreignJar && QuestBook.questExists(new Plan(game), game, Restore.APPLIED_QUEST_IDS.get(0));
+        return foreignJar && QuestBook.questExists(new Plan(game), Quests.APPLIED_QUEST_IDS.get(0));
     }
 
     private static GameDir choose(PrintStream out, boolean yes) throws IOException, Failure {
