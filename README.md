@@ -64,6 +64,7 @@ FTB App, CurseForge, the Modrinth App, ATLauncher and GDLauncher.
 | `--uninstall` | Revert every change the installer made |
 | `--yes`, `-y` | Do not ask for confirmation |
 | `--quests-only` | Restore only the mods and quests, not the recipe, loot, skill and config content |
+| `--no-performance` | Skip the CPU fixes for KubeJS, Incendium, Iron Jetpacks and Pipez |
 | `--no-pyramid` | Leave the Pyramid's Rune Carving quest as your pack version has it |
 | `--force` | Continue on an unrecognized Minecraft version |
 | `--offline` | Use only files already in the download cache |
@@ -95,6 +96,19 @@ FTB App, CurseForge, the Modrinth App, ATLauncher and GDLauncher.
 - Thaumaturge settings for Carry On, ServerCore, Dank Storage, Discord status, JEI and Jade.
 - Key bindings: where a Thaumaturge default collides with another binding, the key gets the pack's 1.0.0 binding.
   Change Focus moves from F to Ctrl+F, for example. Bindings you changed yourself are left alone.
+
+**Performance fixes**
+
+These fixes do not depend on Thaumaturge. [PERFORMANCE.md](PERFORMANCE.md) describes each problem and its evidence.
+
+- KubeJS's local web server is turned off. Its accept loop keeps one core busy for the whole session.
+- A global datapack, `datapacks/evo2-performance`, adds the `in.prism` objective that Incendium's player tick uses
+  but never creates. It also guards the Incendium tick commands that throw several hundred exceptions a second.
+- Iron Jetpacks' HUD reuses its text components, so Minecraft stops re-running bidi reordering on them every frame.
+- Pipez fluid pipes skip building filter lists when a pipe has no filters.
+
+The jar patches apply only to the exact Iron Jetpacks 9.0.3 and Pipez 1.2.31 classes. Another version is skipped
+with a note. A launcher that verifies mod files may report the two patched jars as modified.
 
 The installer adds only what is missing, so after a pack update it re-applies only what the update removed.
 Before writing, it checks the resulting quest book for duplicate IDs, missing quests and item IDs that the

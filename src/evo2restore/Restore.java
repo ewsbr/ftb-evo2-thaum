@@ -26,7 +26,7 @@ final class Restore {
 
     private static final String ABSENT_DATAPACK = "datapacks/thaumaturge-absent";
 
-    record Options(boolean pyramid, boolean integration) {}
+    record Options(boolean pyramid, boolean integration, boolean performance) {}
 
     private final GameDir game;
     private final Downloader downloader;
@@ -56,6 +56,11 @@ final class Restore {
             Integration integration = new Integration(downloader);
             integration.plan(plan);
             notes.addAll(integration.notes);
+        }
+        if (options.performance()) {
+            Performance performance = new Performance();
+            performance.plan(plan, game);
+            notes.addAll(performance.notes);
         }
         if (Files.isDirectory(game.resolve(ABSENT_DATAPACK))) {
             plan.remove(ABSENT_DATAPACK, "hides Thaumaturge items from recipe viewers; it must be off while the mod is loaded");

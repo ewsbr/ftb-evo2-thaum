@@ -1,5 +1,6 @@
 package evo2restore;
 
+import evo2restore.util.Asm;
 import evo2restore.util.Hashes;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -8,9 +9,6 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -77,19 +75,9 @@ final class ThaumPatch {
         return data;
     }
 
-    private static ClassWriter writer() {
-        return new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES) {
-            // Minecraft classes are not on the classpath, so frame computation cannot load them.
-            @Override
-            protected String getCommonSuperClass(String a, String b) {
-                return "java/lang/Object";
-            }
-        };
-    }
-
     /** {@code return value;} becomes {@code if (value == null) return ItemStack.EMPTY; return value;}. */
     private static byte[] patchOutputOf(byte[] bytes) {
-        return transform(bytes, "outputOf", mv -> new MethodVisitor(Opcodes.ASM9, mv) {
+        return Asm.transform(bytes, "outputOf", mv -> new MethodVisitor(Opcodes.ASM9, mv) {
             @Override
             public void visitInsn(int opcode) {
                 if (opcode != Opcodes.ARETURN) {
@@ -110,7 +98,7 @@ final class ThaumPatch {
 
     /** {@code output.isEmpty()} is preceded by {@code if (output == null) return Optional.empty();}. */
     private static byte[] patchUniformOf(byte[] bytes) {
-        return transform(bytes, "uniformOf", mv -> new MethodVisitor(Opcodes.ASM9, mv) {
+        return Asm.transform(bytes, "uniformOf", mv -> new MethodVisitor(Opcodes.ASM9, mv) {
             @Override
             public void visitMethodInsn(int op, String owner, String name, String desc, boolean itf) {
                 if (owner.equals(ITEM_STACK) && name.equals("isEmpty") && desc.equals("()Z")) {
@@ -126,19 +114,5 @@ final class ThaumPatch {
                 super.visitMethodInsn(op, owner, name, desc, itf);
             }
         });
-    }
-
-    private static byte[] transform(
-            byte[] bytes, String method, java.util.function.UnaryOperator<MethodVisitor> wrap) {
-        ClassReader reader = new ClassReader(bytes);
-        ClassWriter writer = writer();
-        reader.accept(new ClassVisitor(Opcodes.ASM9, writer) {
-            @Override
-            public MethodVisitor visitMethod(int access, String name, String desc, String sig, String[] ex) {
-                MethodVisitor mv = super.visitMethod(access, name, desc, sig, ex);
-                return name.equals(method) ? wrap.apply(mv) : mv;
-            }
-        }, ClassReader.EXPAND_FRAMES);
-        return writer.toByteArray();
     }
 }

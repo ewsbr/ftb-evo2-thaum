@@ -1,5 +1,6 @@
 package evo2restore;
 
+import evo2restore.util.FunctionGuard;
 import evo2restore.util.Json5;
 import evo2restore.util.Json5Doc;
 import java.io.ByteArrayOutputStream;
@@ -13,6 +14,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /** Run with ./test.sh. */
 public class RestoreTest {
@@ -20,7 +23,11 @@ public class RestoreTest {
         chapterOrder();
         revertStandIn();
         integrationSources();
-        uninstallAfterPackUpdate(Path.of(args.length > 0 ? args[0] : "build/test-work"));
+        functionGuard();
+        hudTextCacheStandsAlone();
+        Path work = Path.of(args.length > 0 ? args[0] : "build/test-work");
+        uninstallAfterPackUpdate(work);
+        performance(work);
         System.out.println("RestoreTest: all passed");
     }
 
@@ -117,6 +124,77 @@ public class RestoreTest {
         check(Files.readString(root.resolve("a.json")).equals("pack 2"), "a file ends as the updated pack has it");
         check(Files.isDirectory(root.resolve("datapacks/absent")), "a disabled folder is back");
         check(!Files.exists(root.resolve(Plan.STATE_DIR)), "no stale backup is left behind");
+        deleteTree(work);
+    }
+
+    private static void functionGuard() {
+        check(FunctionGuard.rewrite("tag @s remove a").equals("execute if entity @s[tag=a] run tag @s[tag=a] remove a"),
+                "a tag removal runs only on entities that have the tag");
+        check(FunctionGuard.rewrite("  tag @e[type=zombie] add b").equals(
+                "  execute if entity @e[type=zombie,tag=!b] run tag @e[type=zombie,tag=!b] add b"),
+                "a tag addition runs only on matching entities that lack the tag");
+        String score = "scoreboard players remove @s[scores={x=1..},advancements={a:b={c=false}}] x 1";
+        check(FunctionGuard.rewrite(score).equals("execute if entity @s[scores={x=1..},advancements={a:b={c=false}}]"
+                + " run scoreboard players remove @s[scores={x=1..},advancements={a:b={c=false}}] x 1"),
+                "a score change with nested selector arguments is guarded");
+        String kept = "\n# tag @s remove a\nscoreboard players set @s x 0\nexecute as @a run tag @s add a\n";
+        check(FunctionGuard.rewrite(kept).equals(kept),
+                "comments, bare score targets and execute lines are kept");
+    }
+
+    /** Only HudTextCache.class is copied into Iron Jetpacks, so it must load and run with nothing else. */
+    private static void hudTextCacheStandsAlone() throws IOException {
+        byte[] bytes;
+        try (java.io.InputStream in = RestoreTest.class.getClassLoader().getResourceAsStream("evo2restore/patch/HudTextCache.class")) {
+            bytes = in.readAllBytes();
+        }
+        ClassLoader alone = new ClassLoader(null) {
+            @Override
+            protected Class<?> findClass(String name) throws ClassNotFoundException {
+                if (!name.equals("evo2restore.patch.HudTextCache")) throw new ClassNotFoundException(name);
+                return defineClass(name, bytes, 0, bytes.length);
+            }
+        };
+        try {
+            java.lang.reflect.Method intern = alone.loadClass("evo2restore.patch.HudTextCache").getMethod("intern", Object.class);
+            String first = new String("fuel"), equal = new String("fuel");
+            check(intern.invoke(null, first) == first && intern.invoke(null, equal) == first,
+                    "HudTextCache runs as a lone class and returns the first equal instance");
+            for (int i = 0; i < 100; i++) intern.invoke(null, "v" + i);
+            check(intern.invoke(null, equal) == equal, "HudTextCache evicts old entries");
+        } catch (ReflectiveOperationException | LinkageError e) {
+            throw new AssertionError("HudTextCache cannot run alone: " + e, e);
+        }
+    }
+
+    /** KubeJS's web server is turned off with its other settings kept, and Incendium's tick functions are guarded. */
+    private static void performance(Path work) throws IOException {
+        deleteTree(work);
+        Path root = work.resolve(".minecraft");
+        Files.createDirectories(root.resolve("mods"));
+        Files.createDirectories(root.resolve("kubejs/config"));
+        Files.writeString(root.resolve(Performance.WEB_SERVER_CONFIG), "{\"enabled\": true, \"port\": 61423, \"auth\": \"s\"}");
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(root.resolve("mods/m.jar")))) {
+            zip.putNextEntry(new ZipEntry("META-INF/neoforge.mods.toml"));
+            zip.write("[[mods]]\nmodId = \"kubejs\"\n[[mods]]\nmodId = \"incendium\"\n".getBytes(StandardCharsets.UTF_8));
+            zip.putNextEntry(new ZipEntry("data/incendium/function/player/main.mcfunction"));
+            zip.write("tag @s remove a\n".getBytes(StandardCharsets.UTF_8));
+        }
+        GameDir game = new GameDir(root, work, "test", "test", null, null, null);
+        Plan plan = new Plan(game);
+        new Performance().plan(plan, game);
+
+        Map<String, Object> config = Json5.obj(Json5.parse(plan.readText(Performance.WEB_SERVER_CONFIG).orElseThrow()));
+        check(Boolean.FALSE.equals(config.get("enabled")) && "s".equals(Json5.str(config.get("auth"))),
+                "the web server is disabled and its auth token is kept");
+        String guarded = plan.readText(Performance.DATAPACK + "data/incendium/function/player/main.mcfunction").orElseThrow();
+        check(guarded.startsWith("execute if entity @s[tag=a]"), "Incendium's player tick is overridden with guards");
+        check(plan.readText(Performance.DATAPACK + "data/incendium/function/clocks/main.mcfunction").isEmpty(),
+                "a function the jar lacks is not written");
+        plan.apply(new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8));
+        Plan again = new Plan(game);
+        new Performance().plan(again, game);
+        check(again.isEmpty(), "a second run plans nothing");
         deleteTree(work);
     }
 

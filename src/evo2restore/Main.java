@@ -29,6 +29,8 @@ public final class Main {
               --no-pyramid    keep the Witchery version of the Pyramid "Rune Carving" quest
               --quests-only   restore only the quest book and mods, not the 1.0.0 Thaumaturge
                               integration in recipes, loot, worldgen, skills and configs
+              --no-performance
+                              skip the CPU fixes for KubeJS, Incendium, Iron Jetpacks and Pipez
               --force         continue on an unrecognized pack or Minecraft version
               --offline       use only files already in the download cache
               --cache DIR     download cache (default: %s)
@@ -64,7 +66,7 @@ public final class Main {
 
     private static int run(String[] args, PrintStream out) throws Failure, IOException, InterruptedException {
         boolean dryRun = false, uninstall = false, yes = false, pyramid = true, force = false, offline = false;
-        boolean integration = true;
+        boolean integration = true, performance = true;
         boolean list = false;
         Path cache = Downloader.defaultCacheDir();
         Path instance = null;
@@ -75,6 +77,7 @@ public final class Main {
                 case "--yes", "-y" -> yes = true;
                 case "--no-pyramid" -> pyramid = false;
                 case "--quests-only" -> integration = false;
+                case "--no-performance" -> performance = false;
                 case "--force" -> force = true;
                 case "--offline" -> offline = true;
                 case "--list" -> list = true;
@@ -118,7 +121,7 @@ public final class Main {
                     + " this restore is for 1.0.1 and later (--force to continue)");
         }
 
-        Restore restore = new Restore(game, new Downloader(cache, offline), new Restore.Options(pyramid, integration), out);
+        Restore restore = new Restore(game, new Downloader(cache, offline), new Restore.Options(pyramid, integration, performance), out);
         Plan plan = restore.plan();
 
         QuestBook before = QuestBook.load(new Plan(game));
