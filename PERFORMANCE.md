@@ -1,12 +1,13 @@
-# FTB Evolution 2 1.9.0: CPU and allocation findings
+# FTB Evolution 2 1.9.0 and 1.10.0: CPU and allocation findings
 
 These findings come from profiling a player's game on FTB Evolution 2 1.9.0 (Minecraft 26.1.2, NeoForge
 26.1.2.126). Each section lists the problem, the evidence, the fix that this installer applies, and the fix we
-suggest for the pack or upstream.
+suggest for the pack or upstream. 1.10.0 ships the same versions of every mod below, so each fix applies unchanged.
 
 The profile numbers come from two 15–20 s samples on the player's machine. The code findings come from decompiling
 the mod jars that 1.9.0 ships. The FancyMenu findings come from its source on GitHub. Upstream status was checked on
-2026-11-15. 1.9.0 already ships the newest release of every mod below, so no released fix exists for any of them.
+2026-11-15. 1.9.0 ships the newest release of every mod below, and 1.10.0 ships the same jars, so no released fix
+exists for any of them.
 
 The first profile used about 320–370% of one core. After some fixes by hand, including GC flag changes, the second
 used about 226%: render thread 74%, server thread 35%, concurrent GC 41%, chunk render workers 32% and entity culling
@@ -17,6 +18,8 @@ What was tested:
 - `./test.sh` covers the command rewrite, the `web_server.json` merge, re-runs and the standalone helper class.
 - A 1.9.0 dedicated server booted cleanly with all fixes, with no new ERROR or WARN lines. The datapack sorted above
   `mod_data`, `in.prism` existed, and `incendium:clocks/main` ran. No player was online, so `player/main` did not run.
+- A 1.10.0 dedicated server also booted cleanly with all fixes, with no new ERROR or WARN lines. `file/evo2-performance`
+  loaded first among the file packs, and `in.prism` already existed when the server finished loading.
 - The patched Pipez and Iron Jetpacks classes, and the helper class, pass `-Xverify:all` against the 26.1.2 client and
   NeoForge libraries. Neither patched method has run in a game yet.
 - A second install plans nothing, and `--uninstall` restores the original jars byte for byte.
@@ -55,7 +58,7 @@ That thread keeps one core at 100% for the whole session.
 **Pack fix:** ship `"enabled": false`. Upstream, `tiny-java-server` should block in `accept()` or wait on a
 `Selector`.
 
-**Also:** 1.8.1 and 1.9.0 ship `web_server.json` with a fixed `auth` value, so every install has the same token.
+**Also:** 1.8.1, 1.9.0 and 1.10.0 ship `web_server.json` with a fixed `auth` value, so every install has the same token.
 The server binds to `127.0.0.1` when `public_address` is empty, which limits the exposure. Leaving `auth` out of the
 shipped file makes KubeJS generate a random token per install (`WebServerProperties.load()`).
 
