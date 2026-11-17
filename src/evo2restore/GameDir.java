@@ -145,7 +145,25 @@ record GameDir(Path root, Path instance, String launcher, String name, String pa
         } catch (IOException | RuntimeException e) {
             launcher += " (unreadable metadata: " + e.getMessage() + ")";
         }
+        try {
+            Map<String, Object> shipped = packMetadata(gameDir);
+            if (shipped != null) {
+                packVersion = Json5.str(shipped.get("name"));
+                packVersionId = shipped.get("id") instanceof Json5.Num v ? (long) v.doubleValue() : null;
+            }
+        } catch (IOException | RuntimeException e) {
+            launcher += " (unreadable config/metadata.json: " + e.getMessage() + ")";
+        }
         return new GameDir(gameDir, instance, launcher, name, packVersion, packVersionId, minecraft);
+    }
+
+    /** The {@code version} object of the {@code config/metadata.json} that FTB packs ship, or null without one. */
+    private static Map<String, Object> packMetadata(Path gameDir) throws IOException {
+        Path file = gameDir.resolve("config/metadata.json");
+        if (!Files.isRegularFile(file)) return null;
+        Map<String, Object> j = readJson(file);
+        if (!(j.get("id") instanceof Json5.Num id) || id.doubleValue() != FTB_PACK_ID) return null;
+        return j.get("version") instanceof Map<?, ?> v ? Json5.obj(v) : null;
     }
 
     private static String firstString(Map<String, Object> j, String fallback, String... keys) {

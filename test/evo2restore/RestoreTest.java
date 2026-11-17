@@ -28,6 +28,7 @@ public class RestoreTest {
         Path work = Path.of(args.length > 0 ? args[0] : "build/test-work");
         uninstallAfterPackUpdate(work);
         performance(work);
+        packVersionFromShippedMetadata(work);
         System.out.println("RestoreTest: all passed");
     }
 
@@ -196,6 +197,23 @@ public class RestoreTest {
         new Performance().plan(again, game);
         check(again.isEmpty(), "a second run plans nothing");
         deleteTree(work);
+    }
+
+    private static void packVersionFromShippedMetadata(Path work) throws IOException {
+        deleteTree(work);
+        Path root = work.resolve("minecraft");
+        for (String chapter : List.of(Quests.GENERAL_STORAGE, Quests.PYRAMID)) {
+            Files.createDirectories(root.resolve(Quests.chapter(chapter)).getParent());
+            Files.writeString(root.resolve(Quests.chapter(chapter)), "{}");
+        }
+        Files.createDirectories(root.resolve("mods"));
+        Files.writeString(work.resolve("instance.cfg"), "[General]\nname=FTB Evolution 2(2)\n");
+        Files.createDirectories(root.resolve("config"));
+        Files.writeString(root.resolve("config/metadata.json"),
+                "{\"id\": 135, \"version\": {\"id\": 100622, \"name\": \"1.10.0\"}}");
+        GameDir game = GameDir.open(work);
+        check("1.10.0".equals(game.packVersion()) && Long.valueOf(100622).equals(game.packVersionId()),
+                "an unmanaged Prism instance reads its pack version from config/metadata.json");
     }
 
     private static Map<String, Double> group(Object... nameOrder) {
