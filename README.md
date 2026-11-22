@@ -12,6 +12,8 @@ FTB Evolution 2 shipped [Thaumaturge](https://github.com/Leclowndu93150/Thaumatu
 The installer adds both mods back. It merges the Thaumaturge quest chapter and the rest of the removed content
 into later pack versions, without losing the later improvements and fixes.
 
+We also add some minor performance improvements here. For instance, KubeJS runs a busy loop due to a useless web server it runs by default. The script disables it, so you get a full core for free. If you do not want these improvements, pass `--no-performance` to the CLI.
+
 This is a hack that took several manual patches. I hope FTB manages to reintegrate Thaumaturge into the pack.
 
 ## Requirements
